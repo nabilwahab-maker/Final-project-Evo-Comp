@@ -1,7 +1,8 @@
 import streamlit as st
-import random
-import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
 
 # ==========================
 # PAGE CONFIG
@@ -192,3 +193,4 @@ if st.button("🚀 Run Genetic Algorithm", use_container_width=True):
 
     st.subheader("🗓️ Final Schedule (Gantt Chart)")
     st.pyplot(plot_gantt(best, jobs, num_machines))
+
