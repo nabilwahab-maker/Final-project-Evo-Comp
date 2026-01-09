@@ -197,3 +197,4 @@ if st.button("🚀 Run Genetic Algorithm", use_container_width=True):
     st.pyplot(plot_gantt(best, jobs, num_machines))
 
 
+
