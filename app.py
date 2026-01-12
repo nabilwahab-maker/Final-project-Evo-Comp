@@ -18,7 +18,7 @@ def load_data(file):
         df = df.apply(pd.to_numeric, errors='coerce')
         return df.dropna().values
 
-    # Default dataset jika tiada file
+    # Default dataset
     return np.array([
         [10, 20, 5, 15],
         [8, 12, 20, 10],
@@ -44,7 +44,10 @@ def calculate_makespan(sequence, data):
             elif j == 0:
                 finish[m, j] = finish[m-1, j] + p
             else:
-                finish[m, j] = max(finish[m-1, j], finish[m, j-1]) + p
+                finish[m, j] = max(
+                    finish[m-1, j],
+                    finish[m, j-1]
+                ) + p
 
     return finish[-1, -1]
 
@@ -55,24 +58,27 @@ def run_ga(data, pop_size, mutation_rate, generations):
     n_jobs = data.shape[1]
 
     # Initial population (permutation of jobs)
-    population = [random.sample(range(n_jobs), n_jobs) for _ in range(pop_size)]
+    population = [
+        random.sample(range(n_jobs), n_jobs)
+        for _ in range(pop_size)
+    ]
+
     history = []
 
     for _ in range(generations):
-        # Sort population based on makespan (lower is better)
         population.sort(key=lambda s: calculate_makespan(s, data))
         history.append(calculate_makespan(population[0], data))
 
-        # Elitism: take top 2
+        # Elitism (ambil 2 terbaik)
         new_population = population[:2]
 
         while len(new_population) < pop_size:
-            # Parent selection
             parent1, parent2 = random.sample(population[:10], 2)
 
-            # Crossover
             cut = random.randint(1, n_jobs - 1)
-            child = parent1[:cut] + [j for j in parent2 if j not in parent1[:cut]]
+            child = parent1[:cut] + [
+                j for j in parent2 if j not in parent1[:cut]
+            ]
 
             # Mutation (swap)
             if random.random() < mutation_rate:
@@ -89,7 +95,7 @@ def run_ga(data, pop_size, mutation_rate, generations):
     return history, best_sequence, best_makespan, data
 
 # ==================================================
-# STREAMLIT UI
+# STREAMLIT UI (SAMA MACAM ES)
 # ==================================================
 st.set_page_config(page_title="GA Scheduling Optimizer", layout="wide")
 
@@ -112,7 +118,6 @@ gen_val = st.sidebar.slider("Generations", 10, 500, 100)
 if st.button("Start GA Optimization"):
     data = load_data(uploaded_file)
 
-    # Run GA
     hist, best_seq, best_m, raw_data = run_ga(
         data, pop_size, mutation_rate, gen_val
     )
@@ -128,22 +133,20 @@ if st.button("Start GA Optimization"):
     # CONVERGENCE PLOT
     # ======================
     st.subheader("📈 Convergence Analysis")
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.plot(hist, color='blue')
+    fig, ax = plt.subplots()
+    ax.plot(hist)
     ax.set_xlabel("Generation")
     ax.set_ylabel("Makespan")
     ax.set_title("GA Fitness Convergence")
     st.pyplot(fig)
 
     # ======================
-    # GANTT CHART (MATPLOTLIB + AUTO-HIDE LABEL)
+    # GANTT CHART (MATPLOTLIB)
     # ======================
     st.subheader("📅 Optimized Gantt Chart")
 
     finish = np.zeros((raw_data.shape[0], raw_data.shape[1]))
-    num_jobs = raw_data.shape[1]
-    show_label = num_jobs <= 8  # AUTO-HIDE LABEL
-    fig, ax = plt.subplots(figsize=(14, 4))
+    fig, ax = plt.subplots()
 
     for m in range(raw_data.shape[0]):
         for j in range(raw_data.shape[1]):
@@ -160,26 +163,12 @@ if st.button("Start GA Optimization"):
                 start = max(finish[m-1, j], finish[m, j-1])
 
             finish[m, j] = start + p
-
             ax.barh(m, p, left=start)
-
-            # Auto-hide label
-            if show_label:
-                ax.text(
-                    start + p / 2,
-                    m,
-                    f"J{job+1}",
-                    ha='center',
-                    va='center',
-                    color='white',
-                    fontsize=9
-                )
+            ax.text(start + p / 2, m, f"J{job+1}",
+                    ha='center', va='center', color='white')
 
     ax.set_yticks(range(raw_data.shape[0]))
     ax.set_yticklabels([f"Machine {i+1}" for i in range(raw_data.shape[0])])
     ax.set_xlabel("Time")
-    ax.set_title(
-        "GA Optimized Schedule "
-        "(Labels hidden automatically when job count is large)"
-    )
+    ax.set_title("GA Optimized Schedule")
     st.pyplot(fig)
