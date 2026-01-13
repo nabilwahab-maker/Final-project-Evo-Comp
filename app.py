@@ -94,9 +94,8 @@ def run_ga(data, pop_size, mutation_rate, generations):
             key=lambda s: fitness_function(s, data)
         )
 
-        history.append(
-            fitness_function(population[0], data)
-        )
+        best_fitness = fitness_function(population[0], data)
+        history.append(best_fitness)
 
         # Elitism
         new_population = population[:2]
@@ -119,7 +118,9 @@ def run_ga(data, pop_size, mutation_rate, generations):
         population = new_population
 
     best_sequence = population[0]
-    return history, best_sequence
+    final_fitness = fitness_function(best_sequence, data)
+
+    return history, best_sequence, final_fitness
 
 # ==================================================
 # STREAMLIT UI
@@ -149,19 +150,21 @@ generations = st.sidebar.slider("Generations", 10, 500, 100)
 if st.button("Start GA Optimization"):
     data = load_data(uploaded_file)
 
-    history, best_seq = run_ga(
+    history, best_seq, final_fitness = run_ga(
         data, pop_size, mutation_rate, generations
     )
 
     makespan, waiting, util = calculate_metrics(best_seq, data)
 
     # ======================
-    # METRICS
+    # METRICS (FINAL OUTPUT)
     # ======================
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
+
     c1.metric("Makespan", f"{makespan:.2f}")
     c2.metric("Total Waiting Time", f"{waiting:.2f}")
     c3.metric("Machine Utilization", f"{util*100:.2f}%")
+    c4.metric("Final Fitness Value", f"{final_fitness:.2f}")
 
     st.write(f"**Best Job Sequence:** {best_seq}")
 
@@ -172,7 +175,7 @@ if st.button("Start GA Optimization"):
     fig, ax = plt.subplots()
     ax.plot(history)
     ax.set_xlabel("Generation")
-    ax.set_ylabel("Fitness Value")
+    ax.set_ylabel("Aggregated Fitness Value")
     ax.set_title("GA Multi-Objective Fitness Convergence")
     st.pyplot(fig)
 
