@@ -128,6 +128,12 @@ if st.button("Start GA Optimization"):
     col1, col2 = st.columns(2)
     col1.metric("Optimized Makespan", f"{best_m} mins")
     col2.write(f"**Best Sequence:** {best_seq}")
+    
+# -------------------------------------------------
+# DISPLAY FINAL FITNESS
+# -------------------------------------------------
+st.subheader("Final Fitness Value (Makespan)")
+st.write(best_m)
 
     # ======================
     # CONVERGENCE PLOT
@@ -172,4 +178,5 @@ if st.button("Start GA Optimization"):
     ax.set_xlabel("Time")
     ax.set_title("GA Optimized Schedule")
     st.pyplot(fig)
+
 
