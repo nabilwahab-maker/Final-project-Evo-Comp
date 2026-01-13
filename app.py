@@ -166,10 +166,10 @@ if st.button("Start GA Optimization"):
 
     # Metrics
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Makespan", f"{makespan:.2f}")
-    c2.metric("Total Waiting Time", f"{waiting:.2f}")
+    c1.metric("Makespan(minutes)", f"{makespan:.2f}")
+    c2.metric("Total Waiting Time(minutes)", f"{waiting:.2f}")
     c3.metric("Machine Utilization", f"{util*100:.2f}%")
-    c4.metric("Final Fitness Value", f"{final_fitness:.2f}")
+    c4.metric("Final Fitness Value(minutes)", f"{final_fitness:.2f}")
 
     st.write(f"**Best Job Sequence:** {best_seq}")
 
@@ -213,3 +213,4 @@ if st.button("Start GA Optimization"):
     ax.set_xlabel("Time")
     ax.set_title("GA Optimized Schedule")
     st.pyplot(fig)
+
