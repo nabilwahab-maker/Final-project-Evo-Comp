@@ -5,13 +5,12 @@ import matplotlib.pyplot as plt
 import random
 
 # ==================================================
-# LOAD DATA
+# LOAD DATA (Processing Time in MINUTES)
 # ==================================================
 def load_data(file):
     if file is not None:
         df = pd.read_csv(file)
 
-        # Remove non-numeric first column (e.g. Job ID)
         if df.iloc[:, 0].dtype == object:
             df = df.iloc[:, 1:]
 
@@ -25,7 +24,7 @@ def load_data(file):
     ])
 
 # ==================================================
-# MULTI-OBJECTIVE METRICS
+# MULTI-OBJECTIVE METRICS (TIME IN MINUTES)
 # ==================================================
 def calculate_metrics(sequence, data):
     n_machines, n_jobs = data.shape
@@ -35,7 +34,7 @@ def calculate_metrics(sequence, data):
     for m in range(n_machines):
         for j in range(n_jobs):
             job = sequence[j]
-            p = data[m, job]
+            p = data[m, job]  # minutes
 
             if m == 0 and j == 0:
                 start[m, j] = 0
@@ -44,20 +43,23 @@ def calculate_metrics(sequence, data):
             elif j == 0:
                 start[m, j] = finish[m-1, j]
             else:
-                start[m, j] = max(finish[m-1, j], finish[m, j-1])
+                start[m, j] = max(
+                    finish[m-1, j],
+                    finish[m, j-1]
+                )
 
             finish[m, j] = start[m, j] + p
 
-    makespan = finish[-1, -1]
-    waiting_time = np.sum(start)
+    makespan = finish[-1, -1]                 # minutes
+    waiting_time = np.sum(start)               # minutes
 
-    total_processing = np.sum(data)
+    total_processing = np.sum(data)             # minutes
     utilization = total_processing / (makespan * n_machines)
 
     return makespan, waiting_time, utilization
 
 # ==================================================
-# FITNESS FUNCTION (WEIGHTED MULTI-OBJECTIVE)
+# FITNESS FUNCTION (UNITLESS SCORE)
 # ==================================================
 def fitness_function(sequence, data, w_m, w_w, w_u):
     makespan, waiting, util = calculate_metrics(sequence, data)
@@ -67,7 +69,7 @@ def fitness_function(sequence, data, w_m, w_w, w_u):
         w_w * waiting -
         w_u * util * 100
     )
-    return fitness
+    return fitness  # unitless
 
 # ==================================================
 # GENETIC ALGORITHM
@@ -89,12 +91,10 @@ def run_ga(data, pop_size, mutation_rate, generations,
             key=lambda s: fitness_function(s, data, w_m, w_w, w_u)
         )
 
-        best_fitness = fitness_function(
-            population[0], data, w_m, w_w, w_u
+        history.append(
+            fitness_function(population[0], data, w_m, w_w, w_u)
         )
-        history.append(best_fitness)
 
-        # Elitism
         new_population = population[:2]
 
         while len(new_population) < pop_size:
@@ -113,26 +113,20 @@ def run_ga(data, pop_size, mutation_rate, generations,
 
         population = new_population
 
-    best_sequence = population[0]
-    final_fitness = fitness_function(
-        best_sequence, data, w_m, w_w, w_u
-    )
+    best_seq = population[0]
+    final_fitness = fitness_function(best_seq, data, w_m, w_w, w_u)
 
-    return history, best_sequence, final_fitness
+    return history, best_seq, final_fitness
 
 # ==================================================
 # STREAMLIT UI
 # ==================================================
-st.set_page_config(
-    page_title="Multi-Objective GA Scheduling",
-    layout="wide"
-)
+st.set_page_config(page_title="Multi-Objective GA Scheduling", layout="wide")
 
-st.title("🧬 Multi-Objective Genetic Algorithm for Job Scheduling")
+st.title("🧬 Multi-Objective GA for Job Scheduling")
 st.write(
-    "This application implements a **Weighted Multi-Objective Genetic Algorithm** "
-    "to optimize makespan, job waiting time, and machine utilization "
-    "for Flow Shop Scheduling."
+    "Processing times, makespan, and waiting time are measured in **minutes**. "
+    "The final fitness value is an **aggregated unitless score** used for optimization."
 )
 
 # Sidebar
@@ -148,11 +142,11 @@ w_w = st.sidebar.slider("Weight – Waiting Time", 0.0, 1.0, 0.3)
 w_u = st.sidebar.slider("Weight – Machine Utilization", 0.0, 1.0, 0.2)
 
 if w_m + w_w + w_u > 1.0:
-    st.sidebar.error("⚠️ Sum of weights must be ≤ 1")
+    st.sidebar.error("Sum of weights must be ≤ 1")
     st.stop()
 
 # ==================================================
-# RUN GA
+# RUN
 # ==================================================
 if st.button("Start GA Optimization"):
     data = load_data(uploaded_file)
@@ -164,53 +158,18 @@ if st.button("Start GA Optimization"):
 
     makespan, waiting, util = calculate_metrics(best_seq, data)
 
-    # Metrics
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Optimize Makespan", f"{makespan:.2f}")
-    c2.metric("Total Waiting Time", f"{waiting:.2f}")
-    c3.metric("Machine Utilization", f"{util*100:.2f}%")
-    c4.metric("Final Fitness Value", f"{final_fitness:.2f}")
+    c1.metric("Makespan (minutes)", f"{makespan:.2f}")
+    c2.metric("Total Waiting Time (minutes)", f"{waiting:.2f}")
+    c3.metric("Machine Utilization (%)", f"{util*100:.2f}")
+    c4.metric("Final Fitness Value (unitless)", f"{final_fitness:.2f}")
 
     st.write(f"**Best Job Sequence:** {best_seq}")
 
-    # Convergence
     st.subheader("📈 Aggregated Fitness Convergence")
     fig, ax = plt.subplots()
     ax.plot(history)
     ax.set_xlabel("Generation")
-    ax.set_ylabel("Aggregated Fitness Value")
+    ax.set_ylabel("Aggregated Fitness (unitless)")
     ax.set_title("Multi-Objective GA Convergence")
     st.pyplot(fig)
-
-    # Gantt Chart
-    st.subheader("📅 Optimized Gantt Chart")
-
-    n_machines, n_jobs = data.shape
-    finish = np.zeros((n_machines, n_jobs))
-    fig, ax = plt.subplots()
-
-    for m in range(n_machines):
-        for j in range(n_jobs):
-            job = best_seq[j]
-            p = data[m, job]
-
-            if m == 0 and j == 0:
-                start = 0
-            elif m == 0:
-                start = finish[m, j-1]
-            elif j == 0:
-                start = finish[m-1, j]
-            else:
-                start = max(finish[m-1, j], finish[m, j-1])
-
-            finish[m, j] = start + p
-            ax.barh(m, p, left=start)
-            ax.text(start + p/2, m, f"J{job+1}",
-                    ha='center', va='center', color='white')
-
-    ax.set_yticks(range(n_machines))
-    ax.set_yticklabels([f"Machine {i+1}" for i in range(n_machines)])
-    ax.set_xlabel("Time")
-    ax.set_title("GA Optimized Schedule")
-    st.pyplot(fig)
-
