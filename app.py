@@ -57,7 +57,7 @@ def calculate_makespan(sequence, data):
 def run_ga(data, pop_size, mutation_rate, generations):
     n_jobs = data.shape[1]
 
-    # Initial population (permutation of jobs)
+    # Initial population
     population = [
         random.sample(range(n_jobs), n_jobs)
         for _ in range(pop_size)
@@ -95,17 +95,17 @@ def run_ga(data, pop_size, mutation_rate, generations):
     return history, best_sequence, best_makespan, data
 
 # ==================================================
-# STREAMLIT UI (SAMA MACAM ES)
+# STREAMLIT UI
 # ==================================================
 st.set_page_config(page_title="GA Scheduling Optimizer", layout="wide")
 
 st.title("🧬 Genetic Algorithm (GA) for Job Scheduling")
 st.write(
-    "Bahagian ini menggunakan **Genetic Algorithm** "
-    "untuk mengoptimumkan **Makespan** dalam Flow Shop Scheduling."
+    "This application uses **Genetic Algorithm** "
+    "to optimize **Makespan** in Flow Shop Scheduling."
 )
 
-# Sidebar Parameters
+# Sidebar
 st.sidebar.header("Algorithmic Parameters")
 uploaded_file = st.sidebar.file_uploader("Upload CSV Dataset", type="csv")
 pop_size = st.sidebar.slider("Population Size", 10, 100, 20)
@@ -128,12 +128,12 @@ if st.button("Start GA Optimization"):
     col1, col2 = st.columns(2)
     col1.metric("Optimized Makespan", f"{best_m} mins")
     col2.write(f"**Best Sequence:** {best_seq}")
-    
-# -------------------------------------------------
-# DISPLAY FINAL FITNESS
-# -------------------------------------------------
-st.subheader("Final Fitness Value (Makespan)")
-st.write(best_m)
+
+    # ======================
+    # FINAL FITNESS
+    # ======================
+    st.subheader("Final Fitness Value (Makespan)")
+    st.write(best_m)
 
     # ======================
     # CONVERGENCE PLOT
@@ -147,7 +147,7 @@ st.write(best_m)
     st.pyplot(fig)
 
     # ======================
-    # GANTT CHART (MATPLOTLIB)
+    # GANTT CHART
     # ======================
     st.subheader("📅 Optimized Gantt Chart")
 
@@ -178,5 +178,3 @@ st.write(best_m)
     ax.set_xlabel("Time")
     ax.set_title("GA Optimized Schedule")
     st.pyplot(fig)
-
-
