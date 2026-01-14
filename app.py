@@ -38,7 +38,7 @@ def load_data(file):
     ])
 
 # ==================================================
-# METRICS (FIXED IDLE TIME)
+# METRICS (AVERAGE IDLE TIME)
 # ==================================================
 def calculate_metrics(sequence, data):
     n_machines, n_jobs = data.shape
@@ -66,8 +66,7 @@ def calculate_metrics(sequence, data):
     total_processing = np.sum(data)
     total_available = makespan * n_machines
 
-    # 🔧 IMPORTANT FIX
-    # Average machine idle time (minutes)
+    # 🔧 FIX: average machine idle time (minutes)
     idle_time = (total_available - total_processing) / n_machines
 
     utilization = total_processing / total_available
@@ -75,12 +74,12 @@ def calculate_metrics(sequence, data):
     return makespan, idle_time, utilization
 
 # ==================================================
-# FITNESS FUNCTION (NORMALIZED)
+# FITNESS FUNCTION (NORMALIZED + WEIGHTED)
 # ==================================================
 def fitness_function(sequence, data, w_m, w_i, w_u):
     makespan, idle, util = calculate_metrics(sequence, data)
 
-    # 🔧 NORMALIZATION (FINAL SCORE ONLY)
+    # Normalization (final score only)
     norm_makespan = makespan / np.max(data)
     norm_idle = idle / makespan
 
@@ -160,14 +159,21 @@ pop_size = st.sidebar.slider("Population Size", 10, 100, 20)
 mutation_rate = st.sidebar.slider("Mutation Rate", 0.01, 0.5, 0.1)
 generations = st.sidebar.slider("Generations", 10, 500, 100)
 
-st.sidebar.header("Objective Weights (Σ ≤ 1)")
+st.sidebar.header("Objective Weights")
 w_m = st.sidebar.slider("Weight – Makespan", 0.0, 1.0, 0.4)
 w_i = st.sidebar.slider("Weight – Idle Time", 0.0, 1.0, 0.4)
 w_u = st.sidebar.slider("Weight – Utilization", 0.0, 1.0, 0.2)
 
-if w_m + w_i + w_u > 1.0:
-    st.sidebar.error("⚠️ Sum of weights must be ≤ 1")
-    st.stop()
+# 🔧 AUTO NORMALIZE WEIGHTS
+weight_sum = w_m + w_i + w_u
+if weight_sum > 0:
+    w_m /= weight_sum
+    w_i /= weight_sum
+    w_u /= weight_sum
+
+st.sidebar.success(
+    f"Normalized Weights → Makespan: {w_m:.2f}, Idle: {w_i:.2f}, Utilization: {w_u:.2f}"
+)
 
 # ==================================================
 # RUN GA
