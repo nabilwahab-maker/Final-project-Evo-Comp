@@ -17,7 +17,6 @@ def load_data(file):
         df = df.apply(pd.to_numeric, errors='coerce')
         data = df.dropna().values
 
-        # 🔧 FIX ORIENTATION
         if data.shape[0] < data.shape[1]:
             data = data.T
 
@@ -38,7 +37,7 @@ def load_data(file):
     ])
 
 # ==================================================
-# METRICS (MAKESPAN + IDLE TIME)
+# METRICS
 # ==================================================
 def calculate_metrics(sequence, data):
     n_machines, n_jobs = data.shape
@@ -63,26 +62,30 @@ def calculate_metrics(sequence, data):
 
     makespan = finish[-1, -1]
 
-    # 🔧 UPDATED: IDLE TIME (BUKAN WAITING TIME)
     total_processing = np.sum(data)
-    idle_time = (makespan * n_machines) - total_processing
+    total_available = makespan * n_machines
+    idle_time = total_available - total_processing
 
-    utilization = total_processing / (makespan * n_machines)
+    utilization = total_processing / total_available
 
     return makespan, idle_time, utilization
 
 # ==================================================
-# FITNESS FUNCTION (GP-STYLE)
+# NORMALIZED FITNESS FUNCTION
 # ==================================================
 def fitness_function(sequence, data, w_m, w_i, w_u):
     makespan, idle, util = calculate_metrics(sequence, data)
 
-    # 🔧 UPDATED FITNESS (NO WAITING TIME)
+    # 🔧 NORMALIZATION
+    norm_makespan = makespan / np.max(data)
+    norm_idle = idle / (makespan * data.shape[0])
+
     fitness = (
-        w_m * makespan +
-        w_i * idle -
-        w_u * util * 100
+        w_m * norm_makespan +
+        w_i * norm_idle -
+        w_u * util
     )
+
     return fitness
 
 # ==================================================
@@ -105,20 +108,16 @@ def run_ga(data, pop_size, mutation_rate, generations,
             key=lambda s: fitness_function(s, data, w_m, w_i, w_u)
         )
 
-        best_fitness = fitness_function(
-            population[0], data, w_m, w_i, w_u
-        )
-        history.append(best_fitness)
+        best_fit = fitness_function(population[0], data, w_m, w_i, w_u)
+        history.append(best_fit)
 
         new_population = population[:2]
 
         while len(new_population) < pop_size:
-            parent1, parent2 = random.sample(population[:10], 2)
-
+            p1, p2 = random.sample(population[:10], 2)
             cut = random.randint(1, n_jobs - 1)
-            child = parent1[:cut] + [
-                j for j in parent2 if j not in parent1[:cut]
-            ]
+
+            child = p1[:cut] + [j for j in p2 if j not in p1[:cut]]
 
             if random.random() < mutation_rate:
                 a, b = random.sample(range(n_jobs), 2)
@@ -128,50 +127,35 @@ def run_ga(data, pop_size, mutation_rate, generations,
 
         population = new_population
 
-    best_sequence = population[0]
-    final_fitness = fitness_function(
-        best_sequence, data, w_m, w_i, w_u
-    )
+    best_seq = population[0]
+    best_fit = fitness_function(best_seq, data, w_m, w_i, w_u)
 
-    return history, best_sequence, final_fitness
+    return history, best_seq, best_fit
 
 # ==================================================
 # STREAMLIT UI
 # ==================================================
 st.set_page_config(page_title="Multi-Objective GA Scheduling", layout="wide")
-
 st.title("🧬 Multi-Objective Genetic Algorithm for Job Scheduling")
-st.write(
-    "This application implements a **Weighted Multi-Objective Genetic Algorithm** "
-    "to optimize makespan, machine idle time, and machine utilization "
-    "for Flow Shop Scheduling."
-)
 
-# Sidebar
-st.sidebar.header("Algorithm Parameters")
 uploaded_file = st.sidebar.file_uploader("Upload CSV Dataset", type="csv")
 pop_size = st.sidebar.slider("Population Size", 10, 100, 20)
 mutation_rate = st.sidebar.slider("Mutation Rate", 0.01, 0.5, 0.1)
 generations = st.sidebar.slider("Generations", 10, 500, 100)
 
-st.sidebar.header("Multi-Objective Weights (Σ ≤ 1)")
-w_m = st.sidebar.slider("Weight – Makespan", 0.0, 1.0, 0.6)
-w_i = st.sidebar.slider("Weight – Idle Time", 0.0, 1.0, 0.3)
-w_u = st.sidebar.slider("Weight – Utilization", 0.0, 1.0, 0.1)
+st.sidebar.header("Objective Weights (Σ ≤ 1)")
+w_m = st.sidebar.slider("Makespan", 0.0, 1.0, 0.4)
+w_i = st.sidebar.slider("Idle Time", 0.0, 1.0, 0.4)
+w_u = st.sidebar.slider("Utilization", 0.0, 1.0, 0.2)
 
-if w_m + w_i + w_u > 1.0:
-    st.sidebar.error("⚠️ Sum of weights must be ≤ 1")
+if w_m + w_i + w_u > 1:
+    st.error("Sum of weights must be ≤ 1")
     st.stop()
 
-# ==================================================
-# RUN GA
-# ==================================================
-if st.button("Start GA Optimization"):
+if st.button("Start Optimization"):
     data = load_data(uploaded_file)
 
-    st.info(f"Machines: {data.shape[0]} | Jobs: {data.shape[1]}")
-
-    history, best_seq, final_fitness = run_ga(
+    history, best_seq, best_fit = run_ga(
         data, pop_size, mutation_rate, generations,
         w_m, w_i, w_u
     )
@@ -179,27 +163,23 @@ if st.button("Start GA Optimization"):
     makespan, idle, util = calculate_metrics(best_seq, data)
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Makespan (minutes)", f"{makespan:.2f}")
-    c2.metric("Total Idle Time (minutes)", f"{idle:.2f}")
+    c1.metric("Makespan (min)", f"{makespan:.2f}")
+    c2.metric("Total Idle Time (min)", f"{idle:.2f}")
     c3.metric("Machine Utilization", f"{util*100:.2f}%")
-    c4.metric("Total Fitness Value", f"{final_fitness:.2f}")
+    c4.metric("Normalized Fitness", f"{best_fit:.4f}")
 
-    st.write(f"**Best Job Sequence:** {best_seq}")
+    st.write("**Best Job Sequence:**", best_seq)
 
-    # Convergence plot
-    st.subheader("📈 Aggregated Fitness Convergence")
+    # Convergence
+    st.subheader("📈 Fitness Convergence")
     fig, ax = plt.subplots()
     ax.plot(history)
     ax.set_xlabel("Generation")
-    ax.set_ylabel("Aggregated Fitness Value")
-    ax.set_title("Multi-Objective GA Convergence")
+    ax.set_ylabel("Normalized Fitness")
     st.pyplot(fig)
 
-    # ======================
-    # GANTT CHART (KEKAL)
-    # ======================
+    # Gantt Chart (KEKAL)
     st.subheader("📅 Optimized Gantt Chart")
-
     n_machines, n_jobs = data.shape
     finish = np.zeros((n_machines, n_jobs))
     fig, ax = plt.subplots()
@@ -226,5 +206,4 @@ if st.button("Start GA Optimization"):
     ax.set_yticks(range(n_machines))
     ax.set_yticklabels([f"Machine {i+1}" for i in range(n_machines)])
     ax.set_xlabel("Time (minutes)")
-    ax.set_title("GA Optimized Schedule (5 Jobs, 10 Machines)")
     st.pyplot(fig)
