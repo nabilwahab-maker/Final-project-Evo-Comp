@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import random
 
 # ==================================================
-# LOAD DATA (AUTO-FIX ORIENTATION)
+# LOAD DATA
 # ==================================================
 def load_data(file):
     if file is not None:
@@ -16,26 +16,27 @@ def load_data(file):
             df = df.iloc[:, 1:]
 
         df = df.apply(pd.to_numeric, errors='coerce')
+
         data = df.dropna().values
 
-        # 🔧 FIX: If rows < columns, assume Jobs x Machines → transpose
+        # Ensure FLOW SHOP orientation (machines x jobs)
         if data.shape[0] < data.shape[1]:
             data = data.T
 
         return data
 
-    # DEFAULT: 10 MACHINES x 5 JOBS
+    # DEFAULT: 10 MACHINES x 5 JOBS (minutes)
     return np.array([
-        [10, 8, 15, 12, 14],
-        [20, 12, 5, 18, 10],
-        [5, 20, 10, 7, 9],
-        [15, 10, 25, 14, 11],
-        [12, 18, 14, 9, 13],
-        [9, 11, 8, 6, 7],
-        [14, 16, 12, 10, 15],
-        [11, 9, 13, 8, 10],
-        [10, 14, 9, 11, 12],
-        [13, 10, 15, 14, 9]
+        [10, 20, 5, 15, 12],
+        [8, 12, 20, 10, 18],
+        [15, 5, 10, 25, 14],
+        [12, 18, 8, 20, 10],
+        [20, 10, 15, 5, 18],
+        [14, 16, 12, 18, 9],
+        [9, 14, 20, 10, 16],
+        [18, 9, 14, 12, 20],
+        [10, 15, 18, 14, 8],
+        [16, 12, 10, 20, 14]
     ])
 
 # ==================================================
@@ -71,16 +72,35 @@ def calculate_metrics(sequence, data):
     return makespan, waiting_time, utilization
 
 # ==================================================
-# FITNESS FUNCTION (WEIGHTED MULTI-OBJECTIVE)
+# NORMALIZATION (<<< UPDATED >>>)
+# ==================================================
+def normalize_metrics(makespan, waiting, util, data):
+    n_machines, n_jobs = data.shape
+
+    max_makespan = np.sum(data)
+    max_waiting = max_makespan * n_jobs
+
+    m_norm = makespan / max_makespan
+    w_norm = waiting / max_waiting
+    u_norm = util  # already [0,1]
+
+    return m_norm, w_norm, u_norm
+
+# ==================================================
+# FITNESS FUNCTION (NORMALIZED MULTI-OBJECTIVE)
 # ==================================================
 def fitness_function(sequence, data, w_m, w_w, w_u):
     makespan, waiting, util = calculate_metrics(sequence, data)
+    m_norm, w_norm, u_norm = normalize_metrics(
+        makespan, waiting, util, data
+    )
 
     fitness = (
-        w_m * makespan +
-        w_w * waiting -
-        w_u * util * 100
+        w_m * m_norm +
+        w_w * w_norm -
+        w_u * u_norm
     )
+
     return fitness
 
 # ==================================================
@@ -138,15 +158,14 @@ def run_ga(data, pop_size, mutation_rate, generations,
 # STREAMLIT UI
 # ==================================================
 st.set_page_config(
-    page_title="Multi-Objective GA Scheduling",
+    page_title="Normalized Multi-Objective GA Scheduling",
     layout="wide"
 )
 
-st.title("🧬 Multi-Objective Genetic Algorithm for Job Scheduling")
+st.title("🧬 Normalized Multi-Objective Genetic Algorithm")
 st.write(
-    "This application implements a **Weighted Multi-Objective Genetic Algorithm** "
-    "to optimize makespan, job waiting time, and machine utilization "
-    "for Flow Shop Scheduling."
+    "This application applies **normalized weighted multi-objective optimization** "
+    "to Flow Shop Scheduling (5 Jobs × 10 Machines). "
 )
 
 # Sidebar
@@ -156,10 +175,10 @@ pop_size = st.sidebar.slider("Population Size", 10, 100, 20)
 mutation_rate = st.sidebar.slider("Mutation Rate", 0.01, 0.5, 0.1)
 generations = st.sidebar.slider("Generations", 10, 500, 100)
 
-st.sidebar.header("Multi-Objective Weights (Σ ≤ 1)")
+st.sidebar.header("Objective Weights (Σ ≤ 1)")
 w_m = st.sidebar.slider("Weight – Makespan", 0.0, 1.0, 0.5)
 w_w = st.sidebar.slider("Weight – Waiting Time", 0.0, 1.0, 0.3)
-w_u = st.sidebar.slider("Weight – Machine Utilization", 0.0, 1.0, 0.2)
+w_u = st.sidebar.slider("Weight – Utilization", 0.0, 1.0, 0.2)
 
 if w_m + w_w + w_u > 1.0:
     st.sidebar.error("⚠️ Sum of weights must be ≤ 1")
@@ -170,8 +189,6 @@ if w_m + w_w + w_u > 1.0:
 # ==================================================
 if st.button("Start GA Optimization"):
     data = load_data(uploaded_file)
-
-    st.info(f"Machines: {data.shape[0]} | Jobs: {data.shape[1]}")
 
     history, best_seq, final_fitness = run_ga(
         data, pop_size, mutation_rate, generations,
@@ -184,17 +201,17 @@ if st.button("Start GA Optimization"):
     c1.metric("Makespan (minutes)", f"{makespan:.2f}")
     c2.metric("Total Waiting Time (minutes)", f"{waiting:.2f}")
     c3.metric("Machine Utilization", f"{util*100:.2f}%")
-    c4.metric("Total Fitness Value", f"{final_fitness:.2f}")
+    c4.metric("Final Fitness Value (Normalized)", f"{final_fitness:.4f}")
 
     st.write(f"**Best Job Sequence:** {best_seq}")
 
-    # Convergence plot
-    st.subheader("📈 Aggregated Fitness Convergence")
+    # Convergence
+    st.subheader("📈 Normalized Fitness Convergence")
     fig, ax = plt.subplots()
     ax.plot(history)
     ax.set_xlabel("Generation")
-    ax.set_ylabel("Aggregated Fitness Value")
-    ax.set_title("Multi-Objective GA Convergence")
+    ax.set_ylabel("Normalized Fitness")
+    ax.set_title("GA Convergence (Normalized Multi-Objective)")
     st.pyplot(fig)
 
     # Gantt Chart
@@ -225,6 +242,6 @@ if st.button("Start GA Optimization"):
 
     ax.set_yticks(range(n_machines))
     ax.set_yticklabels([f"Machine {i+1}" for i in range(n_machines)])
-    ax.set_xlabel("Time")
-    ax.set_title("GA Optimized Schedule (5 Jobs, 10 Machines)")
+    ax.set_xlabel("Time (minutes)")
+    ax.set_title("Optimized Schedule")
     st.pyplot(fig)
