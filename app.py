@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import random
 
 # ==================================================
-# LOAD DATA
+# LOAD DATA (AUTO-FIX ORIENTATION)
 # ==================================================
 def load_data(file):
     if file is not None:
@@ -16,13 +16,26 @@ def load_data(file):
             df = df.iloc[:, 1:]
 
         df = df.apply(pd.to_numeric, errors='coerce')
-        return df.dropna().values
+        data = df.dropna().values
 
-    # DEFAULT: 3 MACHINES x 5 JOBS
+        # 🔧 FIX: If rows < columns, assume Jobs x Machines → transpose
+        if data.shape[0] < data.shape[1]:
+            data = data.T
+
+        return data
+
+    # DEFAULT: 10 MACHINES x 5 JOBS
     return np.array([
-        [10, 20, 5, 15, 12],
-        [8, 12, 20, 10, 18],
-        [15, 5, 10, 25, 14]
+        [10, 8, 15, 12, 14],
+        [20, 12, 5, 18, 10],
+        [5, 20, 10, 7, 9],
+        [15, 10, 25, 14, 11],
+        [12, 18, 14, 9, 13],
+        [9, 11, 8, 6, 7],
+        [14, 16, 12, 10, 15],
+        [11, 9, 13, 8, 10],
+        [10, 14, 9, 11, 12],
+        [13, 10, 15, 14, 9]
     ])
 
 # ==================================================
@@ -158,6 +171,8 @@ if w_m + w_w + w_u > 1.0:
 if st.button("Start GA Optimization"):
     data = load_data(uploaded_file)
 
+    st.info(f"Machines: {data.shape[0]} | Jobs: {data.shape[1]}")
+
     history, best_seq, final_fitness = run_ga(
         data, pop_size, mutation_rate, generations,
         w_m, w_w, w_u
@@ -173,6 +188,7 @@ if st.button("Start GA Optimization"):
 
     st.write(f"**Best Job Sequence:** {best_seq}")
 
+    # Convergence plot
     st.subheader("📈 Aggregated Fitness Convergence")
     fig, ax = plt.subplots()
     ax.plot(history)
@@ -181,6 +197,7 @@ if st.button("Start GA Optimization"):
     ax.set_title("Multi-Objective GA Convergence")
     st.pyplot(fig)
 
+    # Gantt Chart
     st.subheader("📅 Optimized Gantt Chart")
 
     n_machines, n_jobs = data.shape
@@ -209,5 +226,5 @@ if st.button("Start GA Optimization"):
     ax.set_yticks(range(n_machines))
     ax.set_yticklabels([f"Machine {i+1}" for i in range(n_machines)])
     ax.set_xlabel("Time")
-    ax.set_title("GA Optimized Schedule")
+    ax.set_title("GA Optimized Schedule (5 Jobs, 10 Machines)")
     st.pyplot(fig)
